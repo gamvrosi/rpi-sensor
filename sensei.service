@@ -1,0 +1,13 @@
+[Unit]
+Description=Sensei Omnistat: sensor data collector and smart device controller
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+User=pi
+ExecStart=/usr/bin/env python3 /home/pi/src/sensei-omnistat/sensei.py
+
+[Install]
+WantedBy=multi-user.target
