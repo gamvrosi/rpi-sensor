@@ -70,40 +70,62 @@ async def get_status(plug):
 	return int(plug.is_on == True)
 
 async def toggle_on(plug):
-    await plug.turn_on()
+	await plug.turn_on()
 
 async def toggle_off(plug):
-    await plug.turn_off()
+	await plug.turn_off()
+
+def check_trigger(plug, reading, high, low):
+	global SenseiLogDir
+	global SenseiRHLastOn
+
+	plug_state = asyncio.run(get_status(plug))
+
+	now = datetime.datetime.now()
+	logname = SenseiLogDir + "plug_events_" + now.strftime('%y%m') + ".log"
+
+	if (reading > high) and (not plug_state):
+		asyncio.run(toggle_on(plug))
+		SenseiRHLastOn = now
+		with open(logname, "a") as f:
+			f.write(now.strftime('%H:%M:%S') + " ON\n")
+	elif (reading < low) and (plug_state):
+		asyncio.run(toggle_off(plug))
+		with open(logname, "a") as f:
+			f.write(now.strftime('%H:%M:%S') + " OFF -- Duration = " +
+					str(now-SenseiRHLastOn) + "\n")
 
 def poll_sensor():
 	global SenseiLogDir
+	global SenseiHighRH
+	global SenseiLowRH
 	global RHplug
 
 	# Create sensor object, communicating over the board's default I2C bus
 	i2c = board.I2C()   # Uses board.SCL and board.SCA
-	bme680 = adafruit_bme680.Adafruit_BME680_I2C(i2c)
+	bme680 = adafruit_bme680.Adafruit_BME680_I2C(i2c, refresh_rate=1)
 
-	# Change this to match the location's pressure (hPa) at sea level
+	# XXX: Change this to match the location's pressure (hPa) at sea level
 	bme680.sea_level_pressure = 1013.25
 
 	now = datetime.datetime.now()
 	logname = SenseiLogDir + "sensor_data_" + now.strftime('%y%m%d') + ".log"
 
-	#asyncio.run(toggle(plug))
-
 	with open(logname, "a") as f:
 		f.write(now.strftime('%H:%M:%S ') +
-				format(bme680.temperature, '4.1f') + " " +
-				format(bme680.relative_humidity, '4.1f') + " " +
-				format(bme680.gas, '6d') + " " +
-				format(bme680.pressure, '9.3f') + " " +
-				format(bme680.altitude, '7.2f') + " " +
-				format(asyncio.run(get_status(RHplug)), '1d') + "\n")
+			format(bme680.temperature, '4.1f') + " " +
+			format(bme680.relative_humidity, '4.1f') + " " +
+			format(bme680.gas, '6d') + " " +
+			format(bme680.pressure, '9.3f') + " " +
+			format(bme680.altitude, '7.2f') + " " +
+			format(asyncio.run(get_status(RHplug)), '1d') + "\n")
 
+	check_trigger(RHplug, bme680.relative_humidity, SenseiHighRH, SenseiLowRH)
 
 # Initialize global variables
 SenseiDir = os.environ.get('HOME') + "/.sensei/"
 SenseiLogDir = SenseiDir + "logs/"
+SenseiRHLastOn = datetime.datetime.now()
 
 SenseiPlugAlias = 'Dehumidifier'
 SenseiHighRH = 100
@@ -114,12 +136,12 @@ parse_config()
 
 # Create log dirs if they do not exist already
 if not os.path.exists(SenseiLogDir):
-    try:
-        os.makedirs(SenseiLogDir)
-    except OSError as exc:
-        # Guard against race condition
-        if exc.errno != errno.EEXIST:
-            raise
+	try:
+		os.makedirs(SenseiLogDir)
+	except OSError as exc:
+		# Guard against race condition
+		if exc.errno != errno.EEXIST:
+			raise
 
 signal.signal(signal.SIGINT, signal_handler)
 
