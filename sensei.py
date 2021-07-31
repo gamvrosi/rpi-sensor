@@ -39,6 +39,7 @@ def parse_config():
 	global SenseiLowRH
 	global SenseiInterval
 	global SenseiPlugAlias
+	global SenseiServerAddr
 
 	try:
 		cfg = configparser.ConfigParser()
@@ -47,6 +48,7 @@ def parse_config():
 		SenseiLowRH = int(cfg.get('Humidistat','LowThreshold'))
 		SenseiInterval = int(cfg.get('General','IntervalSecs'))
 		SenseiPlugAlias = cfg.get('Plugs','HumidifierAlias')
+		SenseiServerAddr = cfg.get('General','ServerAddr')
 	except:
 		print("Error: unable to initialize configuration values\n")
 		system.exit(1)
@@ -100,6 +102,7 @@ def poll_sensor():
 	global SenseiHighRH
 	global SenseiLowRH
 	global RHplug
+	global SenseiLatestReading
 
 	# Create sensor object, communicating over the board's default I2C bus
 	i2c = board.I2C()   # Uses board.SCL and board.SCA
@@ -111,26 +114,39 @@ def poll_sensor():
 	now = datetime.datetime.now()
 	logname = SenseiLogDir + "sensor_data_" + now.strftime('%y%m%d') + ".log"
 
+	SenseiLatestReading = "%s %s %s %s %s %s %s\n" % (now.strftime('%H:%M:%S '),
+		format(bme680.temperature, '4.1f'),
+		format(bme680.relative_humidity, '4.1f'),
+		format(bme680.gas, '6d'),
+		format(bme680.pressure, '9.3f'),
+		format(bme680.altitude, '7.2f'),
+		format(asyncio.run(get_status(RHplug)), '1d'))
+
 	with open(logname, "a") as f:
-		f.write(now.strftime('%H:%M:%S ') +
-			format(bme680.temperature, '4.1f') + " " +
-			format(bme680.relative_humidity, '4.1f') + " " +
-			format(bme680.gas, '6d') + " " +
-			format(bme680.pressure, '9.3f') + " " +
-			format(bme680.altitude, '7.2f') + " " +
-			format(asyncio.run(get_status(RHplug)), '1d') + "\n")
+		f.write(SenseiLatestReading)
 
 	check_trigger(RHplug, bme680.relative_humidity, SenseiHighRH, SenseiLowRH)
+
+def push_server_update():
+	global SenseiLatestReading
+	global SenseiServerAddr
+
+	cmd = "ssh %s 'printf \"%s\" > /tmp/sensei.out'" % (SenseiServerAddr, SenseiLatestReading)
+	stream = os.popen(cmd)
 
 # Initialize global variables
 SenseiDir = os.environ.get('HOME') + "/.sensei/"
 SenseiLogDir = SenseiDir + "logs/"
 SenseiRHLastOn = datetime.datetime.now()
 
+SenseiServerAddr = ""
 SenseiPlugAlias = 'Dehumidifier'
 SenseiHighRH = 100
 SenseiLowRH = 0
 SenseiInterval = 30
+
+# Latest logged reading
+SenseiLatestReading = ""
 
 parse_config()
 
@@ -154,5 +170,6 @@ except NameError: print("Error: device with alias '" + SenseiPlugAlias + "' not 
 
 while True:
 	poll_sensor()
+	push_server_update()
 	time.sleep(SenseiInterval)
 
