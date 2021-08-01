@@ -3,6 +3,8 @@ Sensei is a Raspberry Pi program that collects BME680 sensor data and uses it to
 control a Kasa plug. It can be used to build an omnistat, i.e., a thermostat,
 humidistat, etc.
 
+![sensei_sh-day](https://user-images.githubusercontent.com/6475334/127780819-21d7ce1e-bd1d-4cba-a4fe-9ee1b3e85308.png)
+
 # Environment Setup
 
 * Configure default Python version on your Pi
