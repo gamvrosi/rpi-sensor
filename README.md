@@ -51,5 +51,20 @@ humidistat, etc.
   sudo systemctl enable sensei
   ```
 
+# Server-side Setup
+The Pi is responsible for collecting sensor data and controlling the smart plug,
+then periodically pushing the latest measurements to a remote server. The remote
+server will be responsible for visualizing the sensor/plug state using Munin.
 
+* Set up password-less access from Pi to your Server via `ssh`.
+
+* Create a `/var/log/munin/sensei.out` file on the server owned by the user you
+  will ssh as, and make it readable by everyone
+
+* Install Munin plugin
+  ```bash
+  sudo cp sensei.sh .
+  sudo ln -s /usr/share/munin/plugins/sensei.sh sensei.sh
+  sudo service munin-node restart
+  ```
 
