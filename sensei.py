@@ -131,7 +131,7 @@ def push_server_update():
 	global SenseiLatestReading
 	global SenseiServerAddr
 
-	cmd = "ssh %s 'printf \"%s\" > /tmp/sensei.out'" % (SenseiServerAddr, SenseiLatestReading)
+	cmd = "ssh %s 'printf \"%s\" > /var/log/munin/sensei.out'" % (SenseiServerAddr, SenseiLatestReading)
 	stream = os.popen(cmd)
 
 # Initialize global variables
